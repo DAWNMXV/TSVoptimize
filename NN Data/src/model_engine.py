@@ -270,61 +270,60 @@ class ModelEngine:
 
         return score, mae, "Success", importance_dict
 
-        # === 在 ModelEngine 类中添加这个新方法 ===
     def batch_predict(self, df_input):
-            """
-            批量预测接口：接收一个 DataFrame，返回带预测结果的 DataFrame
-            """
-            # 1. 确保包含所有必要的输入列 (缺失填0)
-            df_process = df_input.copy()
-            for col in INPUT_COLS:
-                if col not in df_process.columns:
-                    df_process[col] = 0.0
+        """
+        批量预测接口：接收一个 DataFrame，返回带预测结果的 DataFrame
+        """
+        # 1. 确保包含所有必要的输入列 (缺失填0)
+        df_process = df_input.copy()
+        for col in INPUT_COLS:
+            if col not in df_process.columns:
+                df_process[col] = 0.0
 
-            try:
-                # 2. 加载 X Scaler 并进行特征工程
-                scaler_x_path = os.path.join(SCALER_DIR, 'scaler_X.gz')
-                if not os.path.exists(scaler_x_path):
-                    return None, "Scaler 未找到，请先训练模型"
+        try:
+            # 2. 加载 X Scaler 并进行特征工程
+            scaler_x_path = os.path.join(SCALER_DIR, 'scaler_X.gz')
+            if not os.path.exists(scaler_x_path):
+                return None, "Scaler 未找到，请先训练模型"
 
-                scaler_X = joblib.load(scaler_x_path)
+            scaler_X = joblib.load(scaler_x_path)
 
-                # 批量特征工程
-                X_enhanced = self.feature_engineering_static(df_process)
-                X_scaled = scaler_X.transform(X_enhanced)
+            # 批量特征工程
+            X_enhanced = self.feature_engineering_static(df_process)
+            X_scaled = scaler_X.transform(X_enhanced)
 
-                # 3. 遍历所有物理场模型进行预测
-                results_df = df_input.copy()  # 结果表保留原始输入
+            # 3. 遍历所有物理场模型进行预测
+            results_df = df_input.copy()  # 结果表保留原始输入
 
-                for group_name, cols in OUTPUT_GROUPS.items():
-                    best_model_path = self.get_best_model(group_name)
-                    scaler_y_path = os.path.join(SCALER_DIR, f'scaler_Y_{group_name}.gz')
+            for group_name, cols in OUTPUT_GROUPS.items():
+                best_model_path = self.get_best_model(group_name)
+                scaler_y_path = os.path.join(SCALER_DIR, f'scaler_Y_{group_name}.gz')
 
-                    if best_model_path and os.path.exists(scaler_y_path):
-                        # 加载模型和 Y Scaler
-                        model = load_model(best_model_path)
-                        scaler_Y = joblib.load(scaler_y_path)
+                if best_model_path and os.path.exists(scaler_y_path):
+                    # 加载模型和 Y Scaler
+                    model = load_model(best_model_path)
+                    scaler_Y = joblib.load(scaler_y_path)
 
-                        # 批量预测 (速度很快)
-                        pred_scaled = model.predict(X_scaled, verbose=0)
-                        pred_original = scaler_Y.inverse_transform(pred_scaled)
+                    # 批量预测 (速度很快)
+                    pred_scaled = model.predict(X_scaled, verbose=0)
+                    pred_original = scaler_Y.inverse_transform(pred_scaled)
 
-                        # 将结果填回 DataFrame
-                        for i, col in enumerate(cols):
-                            # 物理约束修正 (非负)
-                            if any(k in col for k in ['Stress', 'T_', 'R_th']):
-                                pred_original[:, i] = np.maximum(0.0, pred_original[:, i])
+                    # 将结果填回 DataFrame
+                    for i, col in enumerate(cols):
+                        # 物理约束修正 (非负)
+                        if any(k in col for k in ['Stress', 'T_', 'R_th']):
+                            pred_original[:, i] = np.maximum(0.0, pred_original[:, i])
 
-                            results_df[col] = pred_original[:, i]
-                    else:
-                        # 如果该物理场没有模型，填 NaN
-                        for col in cols:
-                            results_df[col] = None
+                        results_df[col] = pred_original[:, i]
+                else:
+                    # 如果该物理场没有模型，填 NaN
+                    for col in cols:
+                        results_df[col] = None
 
-                return results_df, "批量预测成功"
+            return results_df, "批量预测成功"
 
-            except Exception as e:
-                return None, str(e)
+        except Exception as e:
+            return None, str(e)
 
     def predict_and_save(self, input_dict):
         """预测并保存到历史记录"""
