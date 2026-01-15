@@ -72,8 +72,8 @@ def main():
         if np.mean(raw_freqs) > 1e6:
             raw_freqs = raw_freqs / 1e9  # Hz -> GHz
 
-        # 定义目标频率 (15.0, 15.5, ..., 55.0)
-        # np.arange 的 stop 是开区间，所以加 0.001 确保包含 55.0
+        # 定义目标频率 (start, start+step, ..., stop)
+        # np.arange 的 stop 是开区间，所以加 0.001 确保包含 stop
         target_freqs = np.arange(cfg.freq_start_ghz, cfg.freq_stop_ghz + 0.001, cfg.freq_step_ghz)
         print(
             f"🎯 目标: {target_freqs[0]} - {target_freqs[-1]} GHz, 步长 {cfg.freq_step_ghz}, 共 {len(target_freqs)} 点")
